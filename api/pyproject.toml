@@ -1,0 +1,23 @@
+[tool.poetry]
+name = "cam-control-api"
+version = "0.1.0"
+description = ""
+authors = ["bashiryounis <ybashir344@gmail.com>"]
+readme = "README.md"
+
+[tool.poetry.dependencies]
+python = ">=3.12,<3.13"
+fastapi = "^0.115.12"
+pydantic = "^2.10.6"
+uvicorn = "^0.34.0"
+asyncpg = "^0.30.0"
+pydantic-settings = "^2.8.1"
+psycopg2-binary = "^2.9.10"
+fsspec = "^2025.3.0"
+setuptools = "^78.1.0"
+onvif-zeep = "^0.2.12"
+
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
