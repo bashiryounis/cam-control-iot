@@ -1,0 +1,15 @@
+version: "3.9"
+
+services:
+  app:
+    build:
+      context: ./api
+      dockerfile: Dockerfile
+    container_name: cam-api
+    command: ./dev_start.sh
+    ports:
+      - "8000:8000"  # Expose FastAPI to host
+    volumes:
+      - ./api:/app
+    network_mode: "host"  # <-- Gives container full access to host network
+
