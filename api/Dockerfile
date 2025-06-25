@@ -3,7 +3,7 @@ FROM python:3.12-slim
 
 # Install curl and necessary packages, including libgit2-dev for pygit2
 RUN apt-get update && \
-    apt-get install -y curl build-essential libpq-dev libgit2-dev
+    apt-get install -y curl build-essential libpq-dev libgit2-dev libgl1
 
 ## install minio client (mc)
 RUN curl https://dl.min.io/client/mc/release/linux-amd64/mc \
