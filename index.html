@@ -1,0 +1,724 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Camera Control Dashboard</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            color: #333;
+        }
+
+        .dashboard {
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+
+        .header {
+            text-align: center;
+            color: white;
+            margin-bottom: 30px;
+        }
+
+        .header h1 {
+            font-size: 2.5rem;
+            margin-bottom: 10px;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
+        }
+
+        .camera-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(600px, 1fr));
+            gap: 20px;
+            margin-bottom: 30px;
+        }
+
+        .camera-panel {
+            background: white;
+            border-radius: 15px;
+            padding: 20px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+            transition: transform 0.3s ease;
+        }
+
+        .camera-panel:hover {
+            transform: translateY(-5px);
+        }
+
+        .camera-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+            padding-bottom: 15px;
+            border-bottom: 2px solid #f0f0f0;
+        }
+
+        .camera-id {
+            font-size: 1.5rem;
+            font-weight: bold;
+            color: #667eea;
+        }
+
+        .status-indicator {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .status-dot {
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            background: #ff4757;
+            transition: background 0.3s ease;
+        }
+
+        .status-dot.connected {
+            background: #2ed573;
+        }
+
+        .status-dot.streaming {
+            background: #ffa502;
+            animation: pulse 2s infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+
+        .video-container {
+            position: relative;
+            background: #000;
+            border-radius: 10px;
+            overflow: hidden;
+            margin-bottom: 20px;
+            aspect-ratio: 4/3;
+        }
+
+        .video-feed {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            display: none;
+        }
+
+        .video-placeholder {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            height: 100%;
+            color: #666;
+            font-size: 1.2rem;
+            background: linear-gradient(45deg, #f0f0f0 25%, transparent 25%),
+                        linear-gradient(-45deg, #f0f0f0 25%, transparent 25%),
+                        linear-gradient(45deg, transparent 75%, #f0f0f0 75%),
+                        linear-gradient(-45deg, transparent 75%, #f0f0f0 75%);
+            background-size: 20px 20px;
+            background-position: 0 0, 0 10px, 10px -10px, -10px 0px;
+        }
+
+        .controls-section {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+        }
+
+        .stream-controls, .ptz-controls {
+            background: #f8f9fa;
+            padding: 15px;
+            border-radius: 10px;
+        }
+
+        .control-group {
+            margin-bottom: 15px;
+        }
+
+        .control-group h3 {
+            margin-bottom: 10px;
+            color: #495057;
+            font-size: 1.1rem;
+        }
+
+        .button-group {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+
+        .btn {
+            padding: 10px 20px;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            font-weight: 500;
+            transition: all 0.3s ease;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+        }
+
+        .btn-primary {
+            background: #667eea;
+            color: white;
+        }
+
+        .btn-danger {
+            background: #ff4757;
+            color: white;
+        }
+
+        .btn-success {
+            background: #2ed573;
+            color: white;
+        }
+
+        .btn-warning {
+            background: #ffa502;
+            color: white;
+        }
+
+        .btn:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .ptz-pad {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 8px;
+            margin: 15px 0;
+            max-width: 200px;
+        }
+
+        .ptz-btn {
+            padding: 15px;
+            background: #6c757d;
+            color: white;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 16px;
+            transition: all 0.2s ease;
+            user-select: none;
+        }
+
+        .ptz-btn:hover {
+            background: #495057;
+            transform: scale(1.05);
+        }
+
+        .ptz-btn:active {
+            transform: scale(0.95);
+        }
+
+        .ptz-center {
+            background: #dc3545;
+        }
+
+        .ptz-center:hover {
+            background: #c82333;
+        }
+
+        .zoom-controls {
+            display: flex;
+            gap: 10px;
+            margin-top: 10px;
+        }
+
+        .connection-panel {
+            background: white;
+            border-radius: 15px;
+            padding: 20px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+            margin-bottom: 20px;
+        }
+
+        .connection-form {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+            align-items: end;
+        }
+
+        .form-group {
+            display: flex;
+            flex-direction: column;
+        }
+
+        .form-group label {
+            margin-bottom: 5px;
+            font-weight: 500;
+            color: #495057;
+        }
+
+        .form-group input {
+            padding: 10px;
+            border: 2px solid #e9ecef;
+            border-radius: 8px;
+            font-size: 14px;
+            transition: border-color 0.3s ease;
+        }
+
+        .form-group input:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+
+        .log-panel {
+            background: #2c3e50;
+            color: #ecf0f1;
+            border-radius: 10px;
+            padding: 15px;
+            height: 150px;
+            overflow-y: auto;
+            font-family: 'Courier New', monospace;
+            font-size: 12px;
+            line-height: 1.4;
+        }
+
+        .log-entry {
+            margin-bottom: 5px;
+            padding: 2px 0;
+        }
+
+        .log-timestamp {
+            color: #95a5a6;
+        }
+
+        .log-error { color: #e74c3c; }
+        .log-success { color: #2ecc71; }
+        .log-info { color: #3498db; }
+        .log-warning { color: #f39c12; }
+
+        @media (max-width: 768px) {
+            .camera-grid {
+                grid-template-columns: 1fr;
+            }
+            
+            .controls-section {
+                grid-template-columns: 1fr;
+            }
+            
+            .connection-form {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="dashboard">
+        <div class="header">
+            <h1>🎥 Camera Control Dashboard</h1>
+            <p>Real-time ONVIF camera streaming and PTZ control</p>
+        </div>
+
+        <div class="connection-panel">
+            <h2>Add New Camera</h2>
+            <form class="connection-form" id="cameraForm">
+                <div class="form-group">
+                    <label for="cameraId">Camera ID</label>
+                    <input type="text" id="cameraId" placeholder="camera-001" required>
+                </div>
+                <div class="form-group">
+                    <label for="cameraIp">IP Address</label>
+                    <input type="text" id="cameraIp" placeholder="192.168.1.100" required>
+                </div>
+                <div class="form-group">
+                    <label for="cameraPort">Port</label>
+                    <input type="number" id="cameraPort" placeholder="80" value="80" required>
+                </div>
+                <div class="form-group">
+                    <label for="username">Username</label>
+                    <input type="text" id="username" placeholder="admin">
+                </div>
+                <div class="form-group">
+                    <label for="password">Password</label>
+                    <input type="password" id="password" placeholder="password">
+                </div>
+                <div class="form-group">
+                    <button type="submit" class="btn btn-primary">➕ Add Camera</button>
+                </div>
+            </form>
+        </div>
+
+        <div class="camera-grid" id="cameraGrid">
+            <!-- Camera panels will be added dynamically -->
+        </div>
+
+        <div class="connection-panel">
+            <h3>System Log</h3>
+            <div class="log-panel" id="logPanel"></div>
+        </div>
+    </div>
+
+    <script>
+        class CameraDashboard {
+            constructor() {
+                this.cameras = new Map();
+                this.connections = new Map();
+                this.init();
+            }
+
+            init() {
+                document.getElementById('cameraForm').addEventListener('submit', (e) => {
+                    e.preventDefault();
+                    this.addCamera();
+                });
+
+                // Add some demo cameras for testing
+                this.addDemoCamera('camera-001', '192.168.1.100');
+                this.addDemoCamera('camera-002', '192.168.1.101');
+            }
+
+            addDemoCamera(id, ip) {
+                const cameraData = {
+                    id: id,
+                    ip: ip,
+                    port: 80,
+                    username: 'admin',
+                    password: 'admin123'
+                };
+                this.createCameraPanel(cameraData);
+            }
+
+            addCamera() {
+                const form = document.getElementById('cameraForm');
+                const formData = new FormData(form);
+                
+                const cameraData = {
+                    id: formData.get('cameraId') || document.getElementById('cameraId').value,
+                    ip: formData.get('cameraIp') || document.getElementById('cameraIp').value,
+                    port: parseInt(formData.get('cameraPort') || document.getElementById('cameraPort').value),
+                    username: formData.get('username') || document.getElementById('username').value,
+                    password: formData.get('password') || document.getElementById('password').value
+                };
+
+                if (!cameraData.id || !cameraData.ip) {
+                    this.log('Please fill in Camera ID and IP Address', 'error');
+                    return;
+                }
+
+                this.createCameraPanel(cameraData);
+                form.reset();
+            }
+
+            createCameraPanel(cameraData) {
+                if (this.cameras.has(cameraData.id)) {
+                    this.log(`Camera ${cameraData.id} already exists`, 'warning');
+                    return;
+                }
+
+                const panel = document.createElement('div');
+                panel.className = 'camera-panel';
+                panel.id = `panel-${cameraData.id}`;
+                
+                panel.innerHTML = `
+                    <div class="camera-header">
+                        <div class="camera-id">${cameraData.id}</div>
+                        <div class="status-indicator">
+                            <div class="status-dot" id="status-${cameraData.id}"></div>
+                            <span id="status-text-${cameraData.id}">Disconnected</span>
+                        </div>
+                    </div>
+                    
+                    <div class="video-container">
+                        <img class="video-feed" id="video-${cameraData.id}" alt="Camera Feed">
+                        <div class="video-placeholder" id="placeholder-${cameraData.id}">
+                            📹 Camera Feed<br>
+                            <small>${cameraData.ip}:${cameraData.port}</small>
+                        </div>
+                    </div>
+                    
+                    <div class="controls-section">
+                        <div class="stream-controls">
+                            <div class="control-group">
+                                <h3>🎬 Stream Control</h3>
+                                <div class="button-group">
+                                    <button class="btn btn-success" onclick="dashboard.connectCamera('${cameraData.id}')">
+                                        🔌 Connect
+                                    </button>
+                                    <button class="btn btn-primary" onclick="dashboard.startStream('${cameraData.id}')" disabled>
+                                        ▶️ Start Stream
+                                    </button>
+                                    <button class="btn btn-warning" onclick="dashboard.stopStream('${cameraData.id}')" disabled>
+                                        ⏹️ Stop Stream
+                                    </button>
+                                    <button class="btn btn-danger" onclick="dashboard.disconnectCamera('${cameraData.id}')">
+                                        🔌 Disconnect
+                                    </button>
+                                    <button class="btn btn-danger" onclick="dashboard.removeCamera('${cameraData.id}')" title="Remove camera from dashboard">
+                                        🗑️ Remove
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="ptz-controls">
+                            <div class="control-group">
+                                <h3>🎮 PTZ Control</h3>
+                                <div class="ptz-pad">
+                                    <button class="ptz-btn" onmousedown="dashboard.startPTZ('${cameraData.id}', -0.5, 0.5)" onmouseup="dashboard.stopPTZ('${cameraData.id}')">↖️</button>
+                                    <button class="ptz-btn" onmousedown="dashboard.startPTZ('${cameraData.id}', 0, 0.5)" onmouseup="dashboard.stopPTZ('${cameraData.id}')">⬆️</button>
+                                    <button class="ptz-btn" onmousedown="dashboard.startPTZ('${cameraData.id}', 0.5, 0.5)" onmouseup="dashboard.stopPTZ('${cameraData.id}')">↗️</button>
+                                    <button class="ptz-btn" onmousedown="dashboard.startPTZ('${cameraData.id}', -0.5, 0)" onmouseup="dashboard.stopPTZ('${cameraData.id}')">⬅️</button>
+                                    <button class="ptz-btn ptz-center" onclick="dashboard.stopPTZ('${cameraData.id}')">⏹️</button>
+                                    <button class="ptz-btn" onmousedown="dashboard.startPTZ('${cameraData.id}', 0.5, 0)" onmouseup="dashboard.stopPTZ('${cameraData.id}')">➡️</button>
+                                    <button class="ptz-btn" onmousedown="dashboard.startPTZ('${cameraData.id}', -0.5, -0.5)" onmouseup="dashboard.stopPTZ('${cameraData.id}')">↙️</button>
+                                    <button class="ptz-btn" onmousedown="dashboard.startPTZ('${cameraData.id}', 0, -0.5)" onmouseup="dashboard.stopPTZ('${cameraData.id}')">⬇️</button>
+                                    <button class="ptz-btn" onmousedown="dashboard.startPTZ('${cameraData.id}', 0.5, -0.5)" onmouseup="dashboard.stopPTZ('${cameraData.id}')">↘️</button>
+                                </div>
+                                <div class="zoom-controls">
+                                    <button class="btn btn-primary" onmousedown="dashboard.startPTZ('${cameraData.id}', 0, 0, 0.5)" onmouseup="dashboard.stopPTZ('${cameraData.id}')">🔍+ Zoom In</button>
+                                    <button class="btn btn-primary" onmousedown="dashboard.startPTZ('${cameraData.id}', 0, 0, -0.5)" onmouseup="dashboard.stopPTZ('${cameraData.id}')">🔍- Zoom Out</button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                `;
+
+                document.getElementById('cameraGrid').appendChild(panel);
+                this.cameras.set(cameraData.id, cameraData);
+                this.log(`Camera panel created for ${cameraData.id}`, 'success');
+            }
+
+            connectCamera(cameraId) {
+                if (this.connections.has(cameraId)) {
+                    this.log(`Camera ${cameraId} already connected`, 'warning');
+                    return;
+                }
+
+                // Use combined endpoint for both streaming and control
+                const wsUrl = `ws://localhost:8000/camera/${cameraId}/combined`;
+                const ws = new WebSocket(wsUrl);
+                
+                ws.onopen = () => {
+                    this.updateStatus(cameraId, 'connected', 'Connected');
+                    this.log(`Connected to camera ${cameraId}`, 'success');
+                    this.updateButtonStates(cameraId, true, false);
+                    
+                    // Send ping every 30 seconds
+                    const pingInterval = setInterval(() => {
+                        if (ws.readyState === WebSocket.OPEN) {
+                            ws.send(JSON.stringify({type: 'ping'}));
+                        } else {
+                            clearInterval(pingInterval);
+                        }
+                    }, 30000);
+                };
+
+                ws.onmessage = (event) => {
+                    const data = JSON.parse(event.data);
+                    this.handleMessage(cameraId, data);
+                };
+
+                ws.onclose = () => {
+                    this.updateStatus(cameraId, 'disconnected', 'Disconnected');
+                    this.log(`Disconnected from camera ${cameraId}`, 'warning');
+                    this.connections.delete(cameraId);
+                    this.updateButtonStates(cameraId, false, false);
+                };
+
+                ws.onerror = (error) => {
+                    this.log(`WebSocket error for ${cameraId}: ${error.message}`, 'error');
+                };
+
+                this.connections.set(cameraId, ws);
+            }
+
+            removeCamera(cameraId) {
+                // First disconnect if connected
+                if (this.connections.has(cameraId)) {
+                    this.disconnectCamera(cameraId);
+                }
+
+                // Remove from cameras map
+                this.cameras.delete(cameraId);
+
+                // Remove the panel from DOM
+                const panel = document.getElementById(`panel-${cameraId}`);
+                if (panel) {
+                    // Add fade out animation
+                    panel.style.transition = 'opacity 0.3s ease, transform 0.3s ease';
+                    panel.style.opacity = '0';
+                    panel.style.transform = 'scale(0.8)';
+                    
+                    setTimeout(() => {
+                        panel.remove();
+                    }, 300);
+                }
+
+                this.log(`Camera ${cameraId} removed from dashboard`, 'warning');
+            }
+
+            disconnectCamera(cameraId) {
+                const ws = this.connections.get(cameraId);
+                if (ws) {
+                    ws.close();
+                    this.connections.delete(cameraId);
+                }
+            }
+
+            startStream(cameraId) {
+                const ws = this.connections.get(cameraId);
+                if (ws && ws.readyState === WebSocket.OPEN) {
+                    ws.send(JSON.stringify({
+                        type: 'stream',
+                        action: 'start'
+                    }));
+                    this.log(`Starting stream for ${cameraId}`, 'info');
+                }
+            }
+
+            stopStream(cameraId) {
+                const ws = this.connections.get(cameraId);
+                if (ws && ws.readyState === WebSocket.OPEN) {
+                    ws.send(JSON.stringify({
+                        type: 'stream',
+                        action: 'stop'
+                    }));
+                    this.log(`Stopping stream for ${cameraId}`, 'info');
+                }
+            }
+
+            startPTZ(cameraId, pan, tilt, zoom = 0) {
+                const ws = this.connections.get(cameraId);
+                if (ws && ws.readyState === WebSocket.OPEN) {
+                    ws.send(JSON.stringify({
+                        type: 'control',
+                        action: 'move',
+                        pan: pan,
+                        tilt: tilt,
+                        zoom: zoom
+                    }));
+                }
+            }
+
+            stopPTZ(cameraId) {
+                const ws = this.connections.get(cameraId);
+                if (ws && ws.readyState === WebSocket.OPEN) {
+                    ws.send(JSON.stringify({
+                        type: 'control',
+                        action: 'stop'
+                    }));
+                }
+            }
+
+            handleMessage(cameraId, data) {
+                switch(data.type) {
+                    case 'frame':
+                        this.updateVideoFeed(cameraId, data.frame);
+                        break;
+                    case 'stream_status':
+                        if (data.status === 'started') {
+                            this.updateStatus(cameraId, 'streaming', 'Streaming');
+                            this.updateButtonStates(cameraId, true, true);
+                        } else if (data.status === 'stopped') {
+                            this.updateStatus(cameraId, 'connected', 'Connected');
+                            this.updateButtonStates(cameraId, true, false);
+                            this.hideVideoFeed(cameraId);
+                        }
+                        break;
+                    case 'control_ack':
+                        // Handle PTZ control acknowledgments
+                        break;
+                    case 'error':
+                        this.log(`Error from ${cameraId}: ${data.message}`, 'error');
+                        break;
+                    case 'pong':
+                        // Handle heartbeat response
+                        break;
+                }
+            }
+
+            updateVideoFeed(cameraId, frameData) {
+                const videoElement = document.getElementById(`video-${cameraId}`);
+                const placeholder = document.getElementById(`placeholder-${cameraId}`);
+                
+                if (videoElement && frameData) {
+                    videoElement.src = `data:image/jpeg;base64,${frameData}`;
+                    videoElement.style.display = 'block';
+                    placeholder.style.display = 'none';
+                }
+            }
+
+            hideVideoFeed(cameraId) {
+                const videoElement = document.getElementById(`video-${cameraId}`);
+                const placeholder = document.getElementById(`placeholder-${cameraId}`);
+                
+                if (videoElement && placeholder) {
+                    videoElement.style.display = 'none';
+                    placeholder.style.display = 'flex';
+                }
+            }
+
+            updateStatus(cameraId, status, text) {
+                const statusDot = document.getElementById(`status-${cameraId}`);
+                const statusText = document.getElementById(`status-text-${cameraId}`);
+                
+                if (statusDot) {
+                    statusDot.className = `status-dot ${status}`;
+                }
+                if (statusText) {
+                    statusText.textContent = text;
+                }
+            }
+
+            updateButtonStates(cameraId, connected, streaming) {
+                const panel = document.getElementById(`panel-${cameraId}`);
+                if (!panel) return;
+
+                const buttons = panel.querySelectorAll('button');
+                buttons.forEach(btn => {
+                    const onclick = btn.getAttribute('onclick');
+                    if (onclick?.includes('connectCamera')) {
+                        btn.disabled = connected;
+                    } else if (onclick?.includes('startStream')) {
+                        btn.disabled = !connected || streaming;
+                    } else if (onclick?.includes('stopStream')) {
+                        btn.disabled = !streaming;
+                    } else if (onclick?.includes('disconnectCamera')) {
+                        btn.disabled = !connected;
+                    }
+                });
+            }
+
+            log(message, type = 'info') {
+                const logPanel = document.getElementById('logPanel');
+                const timestamp = new Date().toLocaleTimeString();
+                const logEntry = document.createElement('div');
+                logEntry.className = `log-entry log-${type}`;
+                logEntry.innerHTML = `<span class="log-timestamp">[${timestamp}]</span> ${message}`;
+                
+                logPanel.appendChild(logEntry);
+                logPanel.scrollTop = logPanel.scrollHeight;
+
+                // Keep only last 100 log entries
+                while (logPanel.children.length > 100) {
+                    logPanel.removeChild(logPanel.firstChild);
+                }
+            }
+        }
+
+        // Initialize dashboard
+        const dashboard = new CameraDashboard();
+    </script>
+</body>
+</html>
