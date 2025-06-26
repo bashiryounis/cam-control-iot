@@ -3,7 +3,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from starlette.responses import RedirectResponse
 from src.core.logging_config import setup_logging
-
+from src.websocket.camera_control_stream import router as camera_control_stream_router
 setup_logging()
 logger = logging.getLogger(__name__)
 
@@ -29,3 +29,5 @@ app.add_middleware(
 @app.get("/", include_in_schema=False)
 def root_redirect():
     return RedirectResponse(url="/docs/")
+
+app.include_router(camera_control_stream_router, tags=["Camera Control and Streaming"])
