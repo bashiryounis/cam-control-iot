@@ -1,38 +1,43 @@
-# Use an official Python runtime as a base image
+# Use official Python slim image
 FROM python:3.12-slim
 
-# Install curl and necessary packages, including libgit2-dev for pygit2
-RUN apt-get update && \
-    apt-get install -y curl build-essential libpq-dev libgit2-dev libgl1
+# Install system dependencies for OpenCV and other packages
+RUN apt-get update && apt-get install -y \
+    build-essential \
+    libpq-dev \
+    libgl1 \
+    libglib2.0-0 \
+    libgtk-3-0 \
+    curl \
+    git \
+    && rm -rf /var/lib/apt/lists/*
 
-## install minio client (mc)
+# Install minio client (mc)
 RUN curl https://dl.min.io/client/mc/release/linux-amd64/mc \
     --create-dirs \
     -o /usr/local/bin/mc && \
     chmod +x /usr/local/bin/mc
 
-# Install Poetry using the official installer and add it to PATH
+# Install Poetry
 RUN curl -sSL https://install.python-poetry.org | python3 -
-    ENV PATH="/root/.local/bin:${PATH}"
+ENV PATH="/root/.local/bin:${PATH}"
 
-## Create and set the working directory
+# Set working directory
 WORKDIR /app
 
-# Copy Poetry configuration files first to leverage Docker cache
+# Copy poetry files and install dependencies
 COPY pyproject.toml poetry.lock* ./
 RUN poetry install --no-root
 
-# Copy the rest of the application code
+# Copy the rest of the application
 COPY . .
 
-
-# Set env variables (optional, if needed)
+# Set Python environment variables
 ENV PYTHONDONTWRITEBYTECODE 1
 ENV PYTHONUNBUFFERED 1
 
-
-# Expose the necessary port(s)
+# Expose port
 EXPOSE 8000
 
-# Start the application with Uvicorn when the container is run
-# CMD ["./dev_start.sh"]
+# Run app
+CMD ["uvicorn", "src.main:app", "--host", "0.0.0.0", "--port", "8000", "--reload"]
