@@ -65,13 +65,25 @@ class CameraService:
         return success
 
     async def move_camera(self, camera_id: str, pan: float, tilt: float, zoom: float = 0) -> bool:
-        """Move camera using PTZ controls."""
-        return await self.onvif_service.move_continuous(camera_id, pan, tilt, zoom)
+        """Move camera using PTZ controls, reconnecting if necessary."""
+        try:
+            return await self.onvif_service.move_continuous(camera_id, pan, tilt, zoom)
+        except Exception as e:
+            logger.warning(f"Camera {camera_id} move failed: {e}. Trying to reconnect...")
+            if await self.ensure_camera_connected(camera_id):
+                return await self.onvif_service.move_continuous(camera_id, pan, tilt, zoom)
+            return False
 
     async def stop_camera_movement(self, camera_id: str) -> bool:
-        """Stop camera PTZ movement."""
-        return await self.onvif_service.stop_movement(camera_id)
-
+        """Stop camera PTZ movement, reconnecting if necessary."""
+        try:
+            return await self.onvif_service.stop_movement(camera_id)
+        except Exception as e:
+            logger.warning(f"Camera {camera_id} stop failed: {e}. Trying to reconnect...")
+            if await self.ensure_camera_connected(camera_id):
+                return await self.onvif_service.stop_movement(camera_id)
+            return False
+        
     async def get_frame(self, camera_id: str) -> Optional[str]:
         """Get current frame from camera."""
         return await self.stream_service.get_frame(camera_id)
