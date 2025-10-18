@@ -334,24 +334,24 @@
             <h2>Add New Camera</h2>
             <form class="connection-form" id="cameraForm">
                 <div class="form-group">
-                    <label for="cameraId">Camera ID</label>
-                    <input type="text" id="cameraId" placeholder="camera-001" required>
+                    <label for="cameraName">Camera Name</label>
+                    <input type="text" id="cameraName" name="name" placeholder="Front Door Camera" required>
                 </div>
                 <div class="form-group">
                     <label for="cameraIp">IP Address</label>
-                    <input type="text" id="cameraIp" placeholder="192.168.1.100" required>
+                    <input type="text" id="cameraIp" name="ip_address" placeholder="192.168.1.100" required>
                 </div>
                 <div class="form-group">
                     <label for="cameraPort">Port</label>
-                    <input type="number" id="cameraPort" placeholder="80" value="80" required>
+                    <input type="number" id="cameraPort" name="port" placeholder="80" value="80" required>
                 </div>
                 <div class="form-group">
                     <label for="username">Username</label>
-                    <input type="text" id="username" placeholder="admin">
+                    <input type="text" id="username" name="username" placeholder="admin" required>
                 </div>
                 <div class="form-group">
                     <label for="password">Password</label>
-                    <input type="password" id="password" placeholder="password">
+                    <input type="password" id="password" name="password" placeholder="password" required>
                 </div>
                 <div class="form-group">
                     <button type="submit" class="btn btn-primary">➕ Add Camera</button>
@@ -374,76 +374,96 @@
             constructor() {
                 this.cameras = new Map();
                 this.connections = new Map();
+                this.apiBaseUrl = 'http://localhost:8000/camera';
                 this.init();
             }
 
-            init() {
-                document.getElementById('cameraForm').addEventListener('submit', (e) => {
+            async init() {
+                await this.fetchCameras();
+
+                // Handle add new camera form
+                document.getElementById('cameraForm').addEventListener('submit', async (e) => {
                     e.preventDefault();
-                    this.addCamera();
+                    await this.addCamera();
                 });
-
-                // Add some demo cameras for testing
-                this.addDemoCamera('camera-001', '192.168.1.100');
-                this.addDemoCamera('camera-002', '192.168.1.101');
             }
 
-            addDemoCamera(id, ip) {
-                const cameraData = {
-                    id: id,
-                    ip: ip,
-                    port: 80,
-                    username: 'admin',
-                    password: 'admin123'
-                };
-                this.createCameraPanel(cameraData);
+            async fetchCameras() {
+                try {
+                    const res = await fetch(this.apiBaseUrl);
+                    if (!res.ok) throw new Error('Failed to fetch cameras');
+                    const cameras = await res.json();
+                    
+                    cameras.forEach(camera => {
+                        this.createCameraPanel(camera);
+                    });
+                    
+                    this.log(`Loaded ${cameras.length} camera(s) from database`, 'success');
+                } catch (err) {
+                    this.log(`Error fetching cameras: ${err.message}`, 'error');
+                }
             }
 
-            addCamera() {
+            async addCamera() {
                 const form = document.getElementById('cameraForm');
                 const formData = new FormData(form);
                 
                 const cameraData = {
-                    id: formData.get('cameraId') || document.getElementById('cameraId').value,
-                    ip: formData.get('cameraIp') || document.getElementById('cameraIp').value,
-                    port: parseInt(formData.get('cameraPort') || document.getElementById('cameraPort').value),
-                    username: formData.get('username') || document.getElementById('username').value,
-                    password: formData.get('password') || document.getElementById('password').value
+                    name: formData.get('name'),
+                    ip_address: formData.get('ip_address'),
+                    port: parseInt(formData.get('port')),
+                    username: formData.get('username'),
+                    password: formData.get('password'),
+                    is_active: false
                 };
 
-                if (!cameraData.id || !cameraData.ip) {
-                    this.log('Please fill in Camera ID and IP Address', 'error');
-                    return;
-                }
+                try {
+                    const res = await fetch(this.apiBaseUrl, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify(cameraData)
+                    });
 
-                this.createCameraPanel(cameraData);
-                form.reset();
+                    if (!res.ok) {
+                        const error = await res.json();
+                        throw new Error(error.detail || 'Failed to add camera');
+                    }
+
+                    const newCamera = await res.json();
+                    this.createCameraPanel(newCamera);
+                    form.reset();
+                    this.log(`Camera ${newCamera.name} added successfully`, 'success');
+                } catch (err) {
+                    this.log(`Error adding camera: ${err.message}`, 'error');
+                }
             }
 
-            createCameraPanel(cameraData) {
-                if (this.cameras.has(cameraData.id)) {
-                    this.log(`Camera ${cameraData.id} already exists`, 'warning');
+            createCameraPanel(camera) {
+                if (this.cameras.has(camera.id)) {
+                    this.log(`Camera ${camera.name} already exists in view`, 'warning');
                     return;
                 }
 
                 const panel = document.createElement('div');
                 panel.className = 'camera-panel';
-                panel.id = `panel-${cameraData.id}`;
+                panel.id = `panel-${camera.id}`;
                 
                 panel.innerHTML = `
                     <div class="camera-header">
-                        <div class="camera-id">${cameraData.id}</div>
+                        <div class="camera-id">${camera.name}</div>
                         <div class="status-indicator">
-                            <div class="status-dot" id="status-${cameraData.id}"></div>
-                            <span id="status-text-${cameraData.id}">Disconnected</span>
+                            <div class="status-dot" id="status-${camera.id}"></div>
+                            <span id="status-text-${camera.id}">Disconnected</span>
                         </div>
                     </div>
                     
                     <div class="video-container">
-                        <img class="video-feed" id="video-${cameraData.id}" alt="Camera Feed">
-                        <div class="video-placeholder" id="placeholder-${cameraData.id}">
+                        <img class="video-feed" id="video-${camera.id}" alt="Camera Feed">
+                        <div class="video-placeholder" id="placeholder-${camera.id}">
                             📹 Camera Feed<br>
-                            <small>${cameraData.ip}:${cameraData.port}</small>
+                            <small>${camera.ip_address}:${camera.port}</small>
                         </div>
                     </div>
                     
@@ -452,19 +472,19 @@
                             <div class="control-group">
                                 <h3>🎬 Stream Control</h3>
                                 <div class="button-group">
-                                    <button class="btn btn-success" onclick="dashboard.connectCamera('${cameraData.id}')">
+                                    <button class="btn btn-success" onclick="dashboard.connectCamera('${camera.id}')">
                                         🔌 Connect
                                     </button>
-                                    <button class="btn btn-primary" onclick="dashboard.startStream('${cameraData.id}')" disabled>
+                                    <button class="btn btn-primary" onclick="dashboard.startStream('${camera.id}')" disabled>
                                         ▶️ Start Stream
                                     </button>
-                                    <button class="btn btn-warning" onclick="dashboard.stopStream('${cameraData.id}')" disabled>
+                                    <button class="btn btn-warning" onclick="dashboard.stopStream('${camera.id}')" disabled>
                                         ⏹️ Stop Stream
                                     </button>
-                                    <button class="btn btn-danger" onclick="dashboard.disconnectCamera('${cameraData.id}')">
+                                    <button class="btn btn-danger" onclick="dashboard.disconnectCamera('${camera.id}')">
                                         🔌 Disconnect
                                     </button>
-                                    <button class="btn btn-danger" onclick="dashboard.removeCamera('${cameraData.id}')" title="Remove camera from dashboard">
+                                    <button class="btn btn-danger" onclick="dashboard.removeCamera('${camera.id}')" title="Remove camera from dashboard">
                                         🗑️ Remove
                                     </button>
                                 </div>
@@ -475,19 +495,19 @@
                             <div class="control-group">
                                 <h3>🎮 PTZ Control</h3>
                                 <div class="ptz-pad">
-                                    <button class="ptz-btn" onmousedown="dashboard.startPTZ('${cameraData.id}', -0.5, 0.5)" onmouseup="dashboard.stopPTZ('${cameraData.id}')">↖️</button>
-                                    <button class="ptz-btn" onmousedown="dashboard.startPTZ('${cameraData.id}', 0, 0.5)" onmouseup="dashboard.stopPTZ('${cameraData.id}')">⬆️</button>
-                                    <button class="ptz-btn" onmousedown="dashboard.startPTZ('${cameraData.id}', 0.5, 0.5)" onmouseup="dashboard.stopPTZ('${cameraData.id}')">↗️</button>
-                                    <button class="ptz-btn" onmousedown="dashboard.startPTZ('${cameraData.id}', -0.5, 0)" onmouseup="dashboard.stopPTZ('${cameraData.id}')">⬅️</button>
-                                    <button class="ptz-btn ptz-center" onclick="dashboard.stopPTZ('${cameraData.id}')">⏹️</button>
-                                    <button class="ptz-btn" onmousedown="dashboard.startPTZ('${cameraData.id}', 0.5, 0)" onmouseup="dashboard.stopPTZ('${cameraData.id}')">➡️</button>
-                                    <button class="ptz-btn" onmousedown="dashboard.startPTZ('${cameraData.id}', -0.5, -0.5)" onmouseup="dashboard.stopPTZ('${cameraData.id}')">↙️</button>
-                                    <button class="ptz-btn" onmousedown="dashboard.startPTZ('${cameraData.id}', 0, -0.5)" onmouseup="dashboard.stopPTZ('${cameraData.id}')">⬇️</button>
-                                    <button class="ptz-btn" onmousedown="dashboard.startPTZ('${cameraData.id}', 0.5, -0.5)" onmouseup="dashboard.stopPTZ('${cameraData.id}')">↘️</button>
+                                    <button class="ptz-btn" onmousedown="dashboard.startPTZ('${camera.id}', -0.5, 0.5)" onmouseup="dashboard.stopPTZ('${camera.id}')">↖️</button>
+                                    <button class="ptz-btn" onmousedown="dashboard.startPTZ('${camera.id}', 0, 0.5)" onmouseup="dashboard.stopPTZ('${camera.id}')">⬆️</button>
+                                    <button class="ptz-btn" onmousedown="dashboard.startPTZ('${camera.id}', 0.5, 0.5)" onmouseup="dashboard.stopPTZ('${camera.id}')">↗️</button>
+                                    <button class="ptz-btn" onmousedown="dashboard.startPTZ('${camera.id}', -0.5, 0)" onmouseup="dashboard.stopPTZ('${camera.id}')">⬅️</button>
+                                    <button class="ptz-btn ptz-center" onclick="dashboard.stopPTZ('${camera.id}')">⏹️</button>
+                                    <button class="ptz-btn" onmousedown="dashboard.startPTZ('${camera.id}', 0.5, 0)" onmouseup="dashboard.stopPTZ('${camera.id}')">➡️</button>
+                                    <button class="ptz-btn" onmousedown="dashboard.startPTZ('${camera.id}', -0.5, -0.5)" onmouseup="dashboard.stopPTZ('${camera.id}')">↙️</button>
+                                    <button class="ptz-btn" onmousedown="dashboard.startPTZ('${camera.id}', 0, -0.5)" onmouseup="dashboard.stopPTZ('${camera.id}')">⬇️</button>
+                                    <button class="ptz-btn" onmousedown="dashboard.startPTZ('${camera.id}', 0.5, -0.5)" onmouseup="dashboard.stopPTZ('${camera.id}')">↘️</button>
                                 </div>
                                 <div class="zoom-controls">
-                                    <button class="btn btn-primary" onmousedown="dashboard.startPTZ('${cameraData.id}', 0, 0, 0.5)" onmouseup="dashboard.stopPTZ('${cameraData.id}')">🔍+ Zoom In</button>
-                                    <button class="btn btn-primary" onmousedown="dashboard.startPTZ('${cameraData.id}', 0, 0, -0.5)" onmouseup="dashboard.stopPTZ('${cameraData.id}')">🔍- Zoom Out</button>
+                                    <button class="btn btn-primary" onmousedown="dashboard.startPTZ('${camera.id}', 0, 0, 0.5)" onmouseup="dashboard.stopPTZ('${camera.id}')">🔍+ Zoom In</button>
+                                    <button class="btn btn-primary" onmousedown="dashboard.startPTZ('${camera.id}', 0, 0, -0.5)" onmouseup="dashboard.stopPTZ('${camera.id}')">🔍- Zoom Out</button>
                                 </div>
                             </div>
                         </div>
@@ -495,8 +515,7 @@
                 `;
 
                 document.getElementById('cameraGrid').appendChild(panel);
-                this.cameras.set(cameraData.id, cameraData);
-                this.log(`Camera panel created for ${cameraData.id}`, 'success');
+                this.cameras.set(camera.id, camera);
             }
 
             connectCamera(cameraId) {
@@ -505,7 +524,6 @@
                     return;
                 }
 
-                // Use combined endpoint for both streaming and control
                 const wsUrl = `ws://localhost:8000/camera/${cameraId}/combined`;
                 const ws = new WebSocket(wsUrl);
                 
@@ -514,7 +532,6 @@
                     this.log(`Connected to camera ${cameraId}`, 'success');
                     this.updateButtonStates(cameraId, true, false);
                     
-                    // Send ping every 30 seconds
                     const pingInterval = setInterval(() => {
                         if (ws.readyState === WebSocket.OPEN) {
                             ws.send(JSON.stringify({type: 'ping'}));
@@ -537,35 +554,47 @@
                 };
 
                 ws.onerror = (error) => {
-                    this.log(`WebSocket error for ${cameraId}: ${error.message}`, 'error');
+                    this.log(`WebSocket error for ${cameraId}`, 'error');
                 };
 
                 this.connections.set(cameraId, ws);
             }
 
-            removeCamera(cameraId) {
-                // First disconnect if connected
+            async removeCamera(cameraId) {
+                if (!confirm('Are you sure you want to remove this camera?')) {
+                    return;
+                }
+
                 if (this.connections.has(cameraId)) {
                     this.disconnectCamera(cameraId);
                 }
 
-                // Remove from cameras map
-                this.cameras.delete(cameraId);
+                try {
+                    const res = await fetch(`${this.apiBaseUrl}/${cameraId}`, {
+                        method: 'DELETE'
+                    });
 
-                // Remove the panel from DOM
-                const panel = document.getElementById(`panel-${cameraId}`);
-                if (panel) {
-                    // Add fade out animation
-                    panel.style.transition = 'opacity 0.3s ease, transform 0.3s ease';
-                    panel.style.opacity = '0';
-                    panel.style.transform = 'scale(0.8)';
-                    
-                    setTimeout(() => {
-                        panel.remove();
-                    }, 300);
+                    if (!res.ok) {
+                        throw new Error('Failed to delete camera from database');
+                    }
+
+                    this.cameras.delete(cameraId);
+
+                    const panel = document.getElementById(`panel-${cameraId}`);
+                    if (panel) {
+                        panel.style.transition = 'opacity 0.3s ease, transform 0.3s ease';
+                        panel.style.opacity = '0';
+                        panel.style.transform = 'scale(0.8)';
+                        
+                        setTimeout(() => {
+                            panel.remove();
+                        }, 300);
+                    }
+
+                    this.log(`Camera ${cameraId} removed successfully`, 'success');
+                } catch (err) {
+                    this.log(`Error removing camera: ${err.message}`, 'error');
                 }
-
-                this.log(`Camera ${cameraId} removed from dashboard`, 'warning');
             }
 
             disconnectCamera(cameraId) {
@@ -637,13 +666,11 @@
                         }
                         break;
                     case 'control_ack':
-                        // Handle PTZ control acknowledgments
                         break;
                     case 'error':
                         this.log(`Error from ${cameraId}: ${data.message}`, 'error');
                         break;
                     case 'pong':
-                        // Handle heartbeat response
                         break;
                 }
             }
@@ -710,14 +737,12 @@
                 logPanel.appendChild(logEntry);
                 logPanel.scrollTop = logPanel.scrollHeight;
 
-                // Keep only last 100 log entries
                 while (logPanel.children.length > 100) {
                     logPanel.removeChild(logPanel.firstChild);
                 }
             }
         }
 
-        // Initialize dashboard
         const dashboard = new CameraDashboard();
     </script>
 </body>
